@@ -23,21 +23,22 @@ All text above, and the splash screen must be included in any redistribution
 #ifndef _ADAFRUIT_SSD1306_H_
 #define _ADAFRUIT_SSD1306_H_
 
-#include "mbed.h"
+// #include "mbed.h"
+#include "main.h"
 #include "Adafruit_GFX.h"
 
 #include <vector>
 #include <algorithm>
 
 // A DigitalOut sub-class that provides a constructed default state
-class DigitalOut2 : public DigitalOut
-{
-public:
-	DigitalOut2(PinName pin, bool active = false) : DigitalOut(pin) { write(active); };
-	DigitalOut2& operator= (int value) { write(value); return *this; };
-	DigitalOut2& operator= (DigitalOut2& rhs) { write(rhs.read()); return *this; };
-	operator int() { return read(); };
-};
+// class DigitalOut2 : public DigitalOut
+// {
+// public:
+// 	DigitalOut2(PinName pin, bool active = false) : DigitalOut(pin) { write(active); };
+// 	DigitalOut2& operator= (int value) { write(value); return *this; };
+// 	DigitalOut2& operator= (DigitalOut2& rhs) { write(rhs.read()); return *this; };
+// 	operator int() { return read(); };
+// };
 
 #define SSD1306_EXTERNALVCC 0x1
 #define SSD1306_SWITCHCAPVCC 0x2
@@ -50,10 +51,18 @@ public:
 class Adafruit_SSD1306 : public Adafruit_GFX
 {
 public:
-	Adafruit_SSD1306(PinName RST, uint8_t rawHeight = 32, uint8_t rawWidth = 128)
+	// Adafruit_SSD1306(PinName RST, uint8_t rawHeight = 32, uint8_t rawWidth = 128)
+	// 	: Adafruit_GFX(rawWidth,rawHeight)
+	// 	, rst(RST,false)
+	// {
+	// 	buffer.resize(rawHeight * rawWidth / 8);
+	// };
+	Adafruit_SSD1306(GPIO_Typedef* RST_port, uint16_t RST_pin, uint8_t rawHeight = 32, uint8_t rawWidth = 128)
 		: Adafruit_GFX(rawWidth,rawHeight)
-		, rst(RST,false)
 	{
+		rst_port = RST_port;
+		rst_pin = RST_pin;
+		HAL_GPIO_WritePin(rst_port, rst_pin, GPIO_PIN_RESET);
 		buffer.resize(rawHeight * rawWidth / 8);
 	};
 
@@ -75,7 +84,9 @@ public:
     
 protected:
 	virtual void sendDisplayBuffer() = 0;
-	DigitalOut2 rst;
+	// DigitalOut2 rst;
+	GPIO_Typedef* rst_port;
+	uint16_t rst_pin;
 
 	// the memory buffer for the LCD
 	std::vector<uint8_t> buffer;
@@ -100,12 +111,37 @@ public:
 	 * @param rawHeight - the vertical number of pixels for the display, defaults to 32
 	 * @param rawWidth - the horizonal number of pixels for the display, defaults to 128
 	 */
-	Adafruit_SSD1306_Spi(SPI &spi, PinName DC, PinName RST, PinName CS, uint8_t rawHieght = 32, uint8_t rawWidth = 128)
-	    : Adafruit_SSD1306(RST, rawHieght, rawWidth)
+	// Adafruit_SSD1306_Spi(SPI &spi, PinName DC, PinName RST, PinName CS, uint8_t rawHieght = 32, uint8_t rawWidth = 128)
+	//     : Adafruit_SSD1306(RST, rawHieght, rawWidth)
+	//     , cs(CS,true)
+	//     , dc(DC,false)
+	//     , mspi(spi)
+	//     {
+	// 	    begin();
+	// 	    splash();
+	// 	    display();
+	//     };
+	Adafruit_SSD1306_Spi(SPI_HandleTypeDef* hspi, 
+		GPIO_TypeDef* DC_port, uint16_t DC_pin, 
+		GPIO_TypeDef* RST_port, uint16_t RST_pin, 
+		GPIO_TypeDef* CS_port, uint16_t CS_pin, 
+		uint8_t rawHieght = 32, uint8_t rawWidth = 128)
+	    : Adafruit_SSD1306(RST_port, RST_pin, rawHieght, rawWidth)
 	    , cs(CS,true)
 	    , dc(DC,false)
 	    , mspi(spi)
 	    {
+			_hspi = hspi;
+			dc_port = DC_port;
+			dc_pin = DC_pin;
+			rst_port = RST_port;
+			rst_pin = RST_pin;
+			cs_port = CS_port;
+			cs_pin = CS_pin;
+
+			HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(dc_port, dc_pin, GPIO_PIN_RESET);
+
 		    begin();
 		    splash();
 		    display();
@@ -113,43 +149,65 @@ public:
 
 	virtual void command(uint8_t c)
 	{
-	    cs = 1;
-	    dc = 0;
-	    cs = 0;
-	    mspi.write(c);
-	    cs = 1;
+	    // cs = 1;
+	    // dc = 0;
+	    // cs = 0;
+	    // mspi.write(c);
+	    // cs = 1;
+		HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(dc_port, dc_pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);
+		HAL_SPI_Transmit(_hspi, &c, 1, HAL_MAX_DELAY);
+		HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
 	};
 
 	virtual void data(uint8_t c)
 	{
-	    cs = 1;
-	    dc = 1;
-	    cs = 0;
-	    mspi.write(c);
-	    cs = 1;
+	    // cs = 1;
+	    // dc = 1;
+	    // cs = 0;
+	    // mspi.write(c);
+	    // cs = 1;
+		HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(dc_port, dc_pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);
+		HAL_SPI_Transmit(_hspi, &c, 1, HAL_MAX_DELAY);
+		HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
 	};
 
 protected:
 	virtual void sendDisplayBuffer()
 	{
-		cs = 1;
-		dc = 1;
-		cs = 0;
+		// cs = 1;
+		// dc = 1;
+		// cs = 0;
+		HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(dc_port, dc_pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);
 
-		for(uint16_t i=0, q=buffer.size(); i<q; i++)
-			mspi.write(buffer[i]);
+		// for(uint16_t i=0, q=buffer.size(); i<q; i++)
+		// 	mspi.write(buffer[i]);
 
-		if(height() == 32)
-		{
-			for(uint16_t i=0, q=buffer.size(); i<q; i++)
-				mspi.write(0);
+		// if(height() == 32)
+		// {
+		// 	for(uint16_t i=0, q=buffer.size(); i<q; i++)
+		// 		mspi.write(0);
+		// }
+		HAL_SPI_Transmit(_hspi, buffer, buffer.size(), HAL_MAX_DELAY);
+		if(height() == 32) {
+			uint8_t* zeros = new uint8_t[buffer.size()];
+			HAL_SPI_Transmit(_hspi, zeros, buffer.size(), HAL_MAX_DELAY);
 		}
 
-		cs = 1;
+		// cs = 1;
+		HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
 	};
 
-	DigitalOut2 cs, dc;
-	SPI &mspi;
+	// DigitalOut2 cs, dc;
+	// SPI &mspi;
+	GPIO_TypeDef *cs_port, *dc_port;
+	uint16_t cs_pin, dc_pin;
+	SPI_HandleTypeDef* _hspi;
 };
 
 /** This is the I2C SSD1306 display driver transport class
@@ -170,11 +228,20 @@ public:
 	 * @param rawHeight - The vertical number of pixels for the display, defaults to 32
 	 * @param rawWidth - The horizonal number of pixels for the display, defaults to 128
 	 */
-	Adafruit_SSD1306_I2c(I2C &i2c, PinName RST, uint8_t i2cAddress = SSD_I2C_ADDRESS, uint8_t rawHeight = 32, uint8_t rawWidth = 128)
-	    : Adafruit_SSD1306(RST, rawHeight, rawWidth)
-	    , mi2c(i2c)
+	// Adafruit_SSD1306_I2c(I2C &i2c, PinName RST, uint8_t i2cAddress = SSD_I2C_ADDRESS, uint8_t rawHeight = 32, uint8_t rawWidth = 128)
+	//     : Adafruit_SSD1306(RST, rawHeight, rawWidth)
+	//     , mi2c(i2c)
+	//     , mi2cAddress(i2cAddress)
+	//     {
+	// 	    begin();
+	// 	    splash();
+	// 	    display();
+	//     };
+	Adafruit_SSD1306_I2c(I2C_HandleTypeDef* hi2c, GPIO_TypeDef* RST_port, uint16_t RST_pin, uint8_t i2cAddress = SSD_I2C_ADDRESS, uint8_t rawHeight = 32, uint8_t rawWidth = 128)
+	    : Adafruit_SSD1306(RST_port, RST_pin, rawHeight, rawWidth)
 	    , mi2cAddress(i2cAddress)
 	    {
+			_hi2c = hi2c;
 		    begin();
 		    splash();
 		    display();
@@ -185,7 +252,8 @@ public:
 		char buff[2];
 		buff[0] = 0; // Command Mode
 		buff[1] = c;
-		mi2c.write(mi2cAddress, buff, sizeof(buff));
+		// mi2c.write(mi2cAddress, buff, sizeof(buff));
+		HAL_I2C_Master_Transmit(_hi2c, mi2cAddress << 1, buff, sizeof(buff), HAL_MAX_DELAY);
 	}
 
 	virtual void data(uint8_t c)
@@ -193,7 +261,8 @@ public:
 		char buff[2];
 		buff[0] = 0x40; // Data Mode
 		buff[1] = c;
-		mi2c.write(mi2cAddress, buff, sizeof(buff));
+		// mi2c.write(mi2cAddress, buff, sizeof(buff));
+		HAL_I2C_Master_Transmit(_hi2c, mi2cAddress << 1, buff, sizeof(buff), HAL_MAX_DELAY);
 	};
 
 protected:
@@ -209,12 +278,15 @@ protected:
 			// TODO - this will segfault if buffer.size() % 16 != 0
 			for(x=1; x<sizeof(buff); x++) 
 				buff[x] = buffer[i+x-1];
-			mi2c.write(mi2cAddress, buff, sizeof(buff));
+			// mi2c.write(mi2cAddress, buff, sizeof(buff));
+			HAL_I2C_Master_Transmit(_hi2c, mi2cAddress << 1, buff, sizeof(buff), HAL_MAX_DELAY);
 		}
 	};
 
-	I2C &mi2c;
-	uint8_t mi2cAddress;
+	// I2C &mi2c;
+	// uint8_t mi2cAddress;
+
+	I2C_HandleTypeDef* _hi2c;
 };
 
 #endif

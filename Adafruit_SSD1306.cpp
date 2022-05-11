@@ -20,7 +20,8 @@ All text above, and the splash screen below must be included in any redistributi
  *  Modified by Neal Horman 7/14/2012 for use in mbed
  */
 
-#include "mbed.h"
+// #include "mbed.h"
+#include "main.h"
 #include "Adafruit_SSD1306.h"
 
 #define SSD1306_SETCONTRAST 0x81
@@ -47,15 +48,20 @@ All text above, and the splash screen below must be included in any redistributi
 
 void Adafruit_SSD1306::begin(uint8_t vccstate)
 {
-    rst = 1;
+    // rst = 1;
+	HAL_GPIO_WritePin(rst_port, rst_pin, GPIO_PIN_SET);
     // VDD (3.3V) goes high at start, lets just chill for a ms
-    wait_ms(1);
+    // wait_ms(1);
+	HAL_Delay(1);
     // bring reset low
     rst = 0;
+	HAL_GPIO_WritePin(rst_port, rst_pin, GPIO_PIN_RESET);
     // wait 10ms
-    wait_ms(10);
+    // wait_ms(10);
+	HAL_Delay(10);
     // bring out of reset
     rst = 1;
+	HAL_GPIO_WritePin(rst_port, rst_pin, GPIO_PIN_SET);
     // turn on VCC (9V?)
 
     command(SSD1306_DISPLAYOFF);

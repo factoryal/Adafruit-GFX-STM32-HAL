@@ -17,7 +17,8 @@ All text above must be included in any redistribution
  *  Modified by Neal Horman 7/14/2012 for use in mbed
  */
 
-#include "mbed.h"
+// #include "mbed.h"
+#include "main.h"
 
 #include "Adafruit_GFX.h"
 #include "glcdfont.h"
